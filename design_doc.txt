@@ -1,0 +1,21 @@
+Use of 2 c files
+
+holiday.c is the driver file. This handles file verification and contents of the files verification.
+also handled user input for places they want to go to.
+
+graph.c is all about creating the 2d array for the graph that handles all the information for costs to places
+also handles the creation of the array of information for each location
+
+I decided on only 2 files, as graph.c is creating the data structures and therefore should handle also getting the data from those structures.
+
+
+I used a 2d array using the floyd-warshall algorithm for storing my costs instead of an adjacency list. I decided on this to allow the ability to know the distance to all other places by simply looking it up in the graph. This allows for easy lookup to find which viable places is the cheapest, and also the ability to reconstruct the path is easy from the secondary 2d graph. 
+
+Algorithms:
+	floyd-warshall
+	complexity - creation = O(v^3)
+			   - lookup = O(1)
+			   - space = O(v^2)
+
+Lookup in the adjacency matrix is faster than an adjacency list and is O(1) if you want to find the cost from 1 place to another immediately. Once the graph has been created, you can lookup anything without having to perform any more algorithms, you simply check to see if there is a path and you can get the cost. Then you simply travel through the next graph to find the path.  
+The matrix works better for dense graphs, and there is potential that a program such as this would be working with dense graphs.

@@ -1,0 +1,749 @@
+============================================
+vis/LOG
+20:54:02_Monday_20_October_2014
+============================================
+
+********************************************************
+Located submitted makefile
+********************************************************
+
+********************************************************
+ Make holiday Application             		      
+********************************************************
+
+gcc -c -Wall holiday.c
+gcc -c -Wall graph.c
+gcc -o holiday holiday.o graph.o
+Holiday Application built successfully
+********************************************************
+*******************************************************
+Executing holiday
+*******************************************************
+
+******************** Output: holiday search **********
+
+Program started
+
+Enter your starting point
+Enter the continent you prefer
+cultural?
+outdoors?
+Moscow 1400
+Singapore Moscow
+******************** END ******************************
+============================================
+src/graph.h
+20:54:01_Monday_20_October_2014
+============================================
+
+
+#define MAXFIELDLEN 80
+
+
+//The structure for nodes that hold information for each place. 
+typedef struct place_node{
+	int node_num;
+	char place_name[MAXFIELDLEN];
+	char country[MAXFIELDLEN];
+	int outdoors;
+	int cultural;
+}place_node;
+
+//MAJOR ISSUES CAUSES SEG FAULT FOR NO REASON I CAN FIND
+//void initialise_space(int** graph, int** pred_graph, place_node* places_list, int num_nodes);
+
+
+//Takes the matrix that stores all the costs information as well as the information about destination, source and the cost weighting
+/*
+Inputs:
+int** graph - the 2d array that holds all the cost information. This will begin as an empty array of allocated space and will be filled in
+int source - the number id of the place that you are travelling from
+int destination- the number id of the place that one is travelling to
+int weight - the wieght of the edge travelling from source to destination
+
+after this has run for every line in the costs file from the main driver program, you should have a 2d array with all costs for every edge directly connected to other nodes
+*/
+void create_graph(int** graph, int** pred_graph, int source, int destination, int weight);
+
+
+//takes the list that places are stored in and all the attributes for a new node and places it in the list
+/*
+Inputs:
+place_node* places_list - This is the list for the main driver program that will contain all the informaiton for each location
+int node_num - the identifier for each node. This number should be unique
+char place[MAXFIELDLEN] - the name of the place for the nodes information
+char country[MAXFIELDLEN] - the name of the country for the nodes information
+int culturla - defines if there are cultural aspects in the place for the nodes information
+int outdoors - defines if there are outdoors activites in the place for the nodes information
+
+after this has run for every line in the places file form the main driver, you should have an array filled with information for every place that is available to be visited
+*/
+void create_places_list(place_node* places_list,int node_num, char place[MAXFIELDLEN], char country[MAXFIELDLEN], int cultural, int outdoors);
+
+
+//used to fill out the graph with distance from every node to every other node
+/*
+Inputs:
+int** graph - the graph that contains information for how muhc it costs to travel from one location to another
+int num_nodes - the number of places that are available to visit in total
+
+once this function has run, the graph should be filled out with total weights from every node to every other node. This includes travelling from point A to pint C through point B
+*/
+void fill_graph(int** graph, int** pred_graph, int num_nodes);
+
+/*
+Inputs:
+places_list - the list of all places avilable to travel to
+continent - the place that the user wants to travel to
+cultural - if the user is intetrested in cultural aspects or not
+outdoors - if the user is interested in outdoors aspects or not
+num_nodes - number of palces that are available to travel to
+
+returns a list of locations id numbers that are relevant to the users preferences in palces to travel to
+*/
+int* relevant_place_search(place_node* places_list, char continent[MAXFIELDLEN], int cultural, int outdoors, int num_nodes);
+
+/*
+Inputs:
+graph - the information of the costs to travel from place A to palce B
+palces_list - the inforamtion on alkl places that are available to travel to
+num_nodes - the number of places that are available tot ravel to
+min_cost - the minimum cost place to be able to travel to, a pointer so that the main function can have this value
+cheapest_place - the palce that is cheapest to travel to, a pointer so that the main can have this value
+user_start - the palce that the user is going to travel from in string form
+place_from - the place that the is going to travel from in int form, a pointer so that this can be available in the main function
+places_to_go - the palces that are relevant for the users inputs as defined earlier
+
+Output:
+return the value of the places that is cheapest to travel to
+
+Finds the place that is cheapest to travel to depending on the users inputs and that cost
+*/
+int find_cheapest_place(int** graph, place_node* places_list, int num_nodes, int* min_cost, int* cheapest_place, char user_start[MAXFIELDLEN], int* place_from, int* places_to_go);
+
+
+
+
+
+
+
+//testing method for printing out the 2d matrix
+/*
+Inputs:
+int** matrix - this is the graph that we want to print out in a visual manner to be able to see
+int num_nodes - the number of nodes that are in the graph
+
+This will print to stdout a table with all the weights for travelling from 1 node to another
+*/
+void print_matrix(int** matrix,int num_nodes);
+============================================
+src/holiday.c
+20:54:01_Monday_20_October_2014
+============================================
+#include "holiday.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "graph.h"
+
+// for every line in a file, it gets assigned to line
+char line[MAXLINELEN];
+
+//files that are going to be read in
+FILE *cost_file;
+FILE *place_file;
+
+//data to be put into nodes that will be read in from file
+char place[MAXFIELDLEN], country[MAXFIELDLEN];
+char tempCult, tempOutdoor;
+int cultural, outdoors, num_nodes, node_num;
+
+int i = 0, j;
+//the two graphs that are going to be used. One for costs between every node
+//and another for the paths taken from one place to another
+int** graph = NULL;
+int** next_graph = NULL;
+
+//list of places in node form with all their information
+place_node *places_list = NULL;
+
+//information for creating the graphs read in form file
+int source, destination, weight;
+
+//user input for searching for relevant locations
+char user_continent[MAXFIELDLEN], user_start[MAXFIELDLEN];
+int user_cultural, user_outdoors;
+
+//pointer to an array for relvent places to search for based on user input
+int* places_to_go;
+
+int place_from;
+int place_to;
+
+int min_cost = -1;
+int cheapest_place;
+
+int
+main(int argc, char **argv){
+	
+	printf("\nProgram started\n\n");
+
+	if(argc != 3){
+		printf("Usage: holiday x y, where x is the places files and y is the costs file\n");
+		exit(ARGERROR);
+	}
+
+	check_places(argv[1]);
+	check_costs(argv[2]);
+
+	//initialise the space for the data structures (through a function in a place I don't want it to be)
+	initialise_space();
+
+	check_places_valid();
+
+
+	if(i < num_nodes){
+		printf("The number at the top of places was greater than the number of actual entries\n");
+		exit(DATAERROR);
+	}
+
+	check_costs_valid();
+	
+	fill_graph(graph, next_graph, num_nodes);
+
+	get_user_input();
+
+	places_to_go = relevant_place_search(places_list, user_continent, user_cultural, user_outdoors, num_nodes);
+
+	place_to = find_cheapest_place(graph, places_list, num_nodes, &min_cost, &cheapest_place, user_start, &place_from, places_to_go);
+
+
+	//checks to see if there is actually any places you can travel to
+	if(min_cost == 0 || min_cost == -1){
+		printf("There is nowhere for you to go that fits your criteria\n");
+		return 0;
+	}
+
+	printf("%s %d\n", places_list[cheapest_place].place_name, min_cost);
+	
+
+	
+	i = place_from;
+	j = cheapest_place;
+	
+
+	// goes through the next_graph to find the path to the location you want to go to
+	while(i != j){
+
+		printf("%s ", places_list[i].place_name);
+		i = next_graph[i][j];
+
+	}
+	printf("%s\n", places_list[i].place_name);
+
+	
+	return 0;
+}
+
+
+void
+check_places(char* filename){
+
+	if( (place_file=fopen(filename, "r")) == NULL){
+		printf("Error opening places file\n");
+		exit(FILEERROR);
+	}
+
+	if(fgets(line, sizeof(line), place_file) == NULL){
+		printf("places file is empty\n");
+		exit(EMPTYFILE);
+	}
+
+	if(sscanf(line, "%d", &num_nodes) != 1){
+		printf("The first line of the places file should state how many places there are\n");
+		exit(DATAERROR);
+	}
+
+}
+
+void
+check_costs(char* filename){
+
+	if( (cost_file=fopen(filename, "r")) == NULL){
+		printf("Error opening costs file\n");
+		exit(FILEERROR);
+	}
+	
+}
+
+void
+initialise_space(void){
+
+	graph = (int**) malloc(num_nodes*sizeof(int*));
+	if(graph == NULL){
+		printf("Error allocating memory for graph\n");
+		exit(MEMERROR);
+	}
+
+	for(j=0; j<num_nodes; j++){
+		graph[j] = (int*) malloc(num_nodes*sizeof(int));
+		if(graph[j] == NULL){
+			printf("Error allocating memory for graph\n");
+			exit(MEMERROR);
+		}
+	}
+	
+	
+
+	next_graph = (int**) malloc(num_nodes*sizeof(int*));
+
+	if(next_graph == NULL){
+		printf("Error allocating memory for graph\n");
+		exit(MEMERROR);
+	}
+
+	for(j=0; j<num_nodes;j++){
+		next_graph[j] = (int*)malloc(num_nodes*sizeof(int));
+		if(next_graph[j] == NULL){
+			printf("Error allocating memory for graph\n");
+			exit(MEMERROR);
+		}
+	}
+
+	for(i=0;i<num_nodes;i++){
+		for(j=0;j<num_nodes;j++){
+			next_graph[i][j] = -1;
+		}
+	}
+
+	//Initialise the information array for places
+	places_list = (place_node*) malloc(num_nodes*sizeof(place_node));
+
+}
+
+void
+check_places_valid(){
+	i=0;
+	while(fgets(line, sizeof(line), place_file)){
+
+		if(i == num_nodes){
+			printf("There are more entries in the places file than defined at the top\n");
+			exit(DATAERROR);
+		}
+
+		if(sscanf(line, "%d %s %s %c %c", &node_num, place, country, &tempCult, &tempOutdoor) != 5){
+			printf("Not enough information on a line in the places file\n");
+			exit(DATAERROR);
+		}
+
+		if(node_num-1 != i){
+			printf("data entries in places file is incorrectly ordered\n");
+			exit(DATAERROR);
+		}
+		
+		if(tempCult == 'Y'){
+			cultural = 1;
+		}
+		else{
+			cultural = 0;
+		}
+		if(tempOutdoor == 'Y'){
+			outdoors = 1;
+		}
+		else{
+			outdoors = 0;
+		}
+
+		create_places_list(places_list, node_num-1, place, country, cultural, outdoors);
+
+		i += 1;
+
+
+	}
+}
+
+void
+check_costs_valid(void){
+	i = 0;
+	while(fgets(line, sizeof(line), cost_file)){
+
+		if(sscanf(line, "%d %d %d", &source, &destination, &weight) != 3){
+			printf("number of variables stored on a line in costs in not correct\n");
+			exit(DATAERROR);
+		}
+		source -= 1;
+		destination -= 1;
+
+		create_graph(graph, next_graph, source, destination, weight);
+
+		i += 1;
+
+	}
+}
+
+void
+get_user_input(){
+
+
+	printf("Enter your starting point\n");
+
+	fgets(line, sizeof(line), stdin);
+
+	sscanf(line, "%s", user_start);
+
+	printf("Enter the continent you prefer\n");
+
+	fgets(line, sizeof(line), stdin);
+
+	sscanf(line, "%s", user_continent);
+
+	printf("cultural?\n");
+
+	fgets(line, sizeof(line), stdin);
+
+	sscanf(line, "%c", &tempCult);
+
+	if(tempCult == 'Y'){
+		user_cultural = 1;
+	}
+	else{
+		user_cultural = 0;
+	}
+
+	printf("outdoors?\n");
+
+	fgets(line, sizeof(line), stdin);
+
+	sscanf(line, "%c", &tempOutdoor);
+
+
+	if(tempOutdoor == 'Y'){
+			user_outdoors = 1;
+		}
+	else{
+			user_outdoors = 0;
+		}
+
+}
+
+/*
+	strcpy(user_start, "Melbourne");
+	strcpy(user_continent, "Europe");
+	user_outdoors = 0;
+	user_cultural = 0;
+	*/============================================
+src/makefile
+20:54:01_Monday_20_October_2014
+============================================
+
+holiday: holiday.o graph.o
+	gcc -o holiday holiday.o graph.o
+
+graph.o: graph.c graph.h
+	gcc -c -Wall graph.c
+
+holiday.o: holiday.c holiday.h
+	gcc -c -Wall holiday.c
+============================================
+src/design_doc.txt
+20:54:01_Monday_20_October_2014
+============================================
+Use of 2 c files
+
+holiday.c is the driver file. This handles file verification and contents of the files verification.
+also handled user input for places they want to go to.
+
+graph.c is all about creating the 2d array for the graph that handles all the information for costs to places
+also handles the creation of the array of information for each location
+
+I decided on only 2 files, as graph.c is creating the data structures and therefore should handle also getting the data from those structures.
+
+
+I used a 2d array using the floyd-warshall algorithm for storing my costs instead of an adjacency list. I decided on this to allow the ability to know the distance to all other places by simply looking it up in the graph. This allows for easy lookup to find which viable places is the cheapest, and also the ability to reconstruct the path is easy from the secondary 2d graph. 
+
+Algorithms:
+	floyd-warshall
+	complexity - creation = O(v^3)
+			   - lookup = O(1)
+			   - space = O(v^2)
+
+Lookup in the adjacency matrix is faster than an adjacency list and is O(1) if you want to find the cost from 1 place to another immediately. Once the graph has been created, you can lookup anything without having to perform any more algorithms, you simply check to see if there is a path and you can get the cost. Then you simply travel through the next graph to find the path.  
+The matrix works better for dense graphs, and there is potential that a program such as this would be working with dense graphs.============================================
+src/holiday.h
+20:54:01_Monday_20_October_2014
+============================================
+
+
+
+/* max lengths for various parts of program */
+#define MAXLINELEN 256
+#define MAXFIELDLEN 80
+
+/* errors that may occur */
+#define ARGERROR 1
+#define FILEERROR 2
+#define DATAERROR 3
+#define EMPTYFILE 4
+#define MEMERROR 5
+
+/*
+Inputs: The filename for the places file
+
+checks to see if the file is valid for places
+*/
+void check_places(char* filename);
+
+/*
+Inputs: The filename for the costs file
+
+checks to see if the file is valid for costs
+*/
+void check_costs(char* filename);
+
+/*
+I didn't want to make this function here, I wanted to move it to graph.c.
+For some reason when I did this it caused a seg fault, despite the code being the same,
+and pointers being parsed in and the structure seemingly returning correctly
+
+Inputs: None, grabs them from the main file in holiday.c due to major issues above
+Creates the 2 graphs for costs and paths, as well as the storage space for the different locations and their information
+*/
+void initialise_space(void);
+
+/*
+Inputs: none
+
+checks if the inputs are valid for another function before running it, and then executes that function
+*/
+void check_places_valid(void);
+
+/*
+checks if inputs are valid for another function before running it
+*/
+void check_costs_valid(void);
+
+/*
+Gets the users input for place to depart from, continent to travel to and if cultural and outdoors are required
+*/
+void get_user_input(void);============================================
+src/graph.c
+20:54:01_Monday_20_October_2014
+============================================
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "graph.h"
+#include "holiday.h"
+
+
+
+//Takes the matrix that stores all the costs information as well as the information about destination, source and the cost weighting
+void 
+create_graph(int** graph,int** next_graph, int source, int destination, int weight){
+
+	graph[source][destination] = weight;
+	next_graph[source][destination] = destination;
+
+}
+
+
+//takes the list that places are stored in and all the attributes for a new node and places it in the list
+void 
+create_places_list(place_node* places_list,int node_num, char place[MAXFIELDLEN], char country[MAXFIELDLEN], int cultural, int outdoors){
+
+	place_node node;
+
+	node = places_list[node_num];
+
+	node.node_num = node_num;
+	strcpy(node.place_name, place);
+	strcpy(node.country, country);
+	node.outdoors = outdoors;
+	node.cultural = cultural;
+
+
+
+	places_list[node_num] = node;
+
+}
+
+void
+fill_graph(int** graph, int** next_graph, int num_nodes){
+
+	int s,d,k;
+
+	//floyd-warshall algorithm to fill out the graph with the distance from every place to every other place posible
+	for(k=0;k<num_nodes;k++){
+		for(s=0;s<num_nodes;s++){
+			for(d=0;d<num_nodes;d++){
+				if(s == d){continue;}
+				if(graph[s][k] && graph[k][d]){
+					if((graph[s][d] > (graph[s][k] + graph[k][d])) || graph[s][d] == 0){
+						graph[s][d] = graph[s][k] + graph[k][d];
+						next_graph[s][d] = next_graph[s][k];
+					}
+				}
+			}
+		}
+	}
+
+}
+
+
+int *
+relevant_place_search(place_node* places_list, char continent[MAXFIELDLEN], int cultural, int outdoors, int num_nodes){
+	
+	int i = 0, j = 0;
+	
+	int* array;
+
+	array = (int*) malloc(num_nodes+1*sizeof(int));
+
+
+
+	for(i=0;i<num_nodes+1;i++){
+		array[i] = -1;
+	}
+
+	//checks all possible places to see if their information matches what the user is searching for
+	i = 0;
+	while(i < num_nodes){
+		if((strcmp(places_list[i].country, continent) == 0) || (strcmp(continent, "") == 0)){
+			if(!cultural || (cultural && places_list[i].cultural)){
+				if(!outdoors || (outdoors && places_list[i].outdoors)){
+					array[j] = places_list[i].node_num;
+					j++;
+				}
+			}
+		}
+
+		i++;
+	}
+
+	return array;
+
+
+}
+
+int 
+find_cheapest_place(int** graph, place_node* places_list, int num_nodes, int* min_cost, int* cheapest_place, char user_start[MAXFIELDLEN], int* place_from, int* places_to_go){
+
+	int i;
+	int place_to;
+
+	//figures out what number the users places of origin is from the places_list based on their input
+	for(i=0;i<num_nodes;i++){
+		if(strcmp(user_start, places_list[i].place_name) == 0){
+			*place_from = places_list[i].node_num;
+		}
+	}
+
+	
+	i=0;
+	while(places_to_go[i] != -1){
+
+		
+
+		place_to = places_to_go[i];
+
+		if(place_to == *place_from){
+			i++;
+			continue;
+		}
+		//updates the minimum cost and cheapest places if it es better than the previous one searched for
+		if((*min_cost == -1) || graph[*place_from][place_to] < *min_cost){
+			*min_cost = graph[*place_from][place_to];
+			*cheapest_place = place_to;
+		}
+		i++;
+	}
+
+	return place_to;
+
+}
+
+
+
+
+
+
+
+//testing methods for printing out the 2d matrix
+void
+print_matrix(int** matrix,int num_nodes){
+    int i = 0;
+    int j = 0;
+    
+    printf("--------------------------\n");
+
+    for(i=0;i<num_nodes;i++){
+    	printf("%6d", i);
+    }
+
+    printf("\n\n");
+    
+    for(i=0;i<num_nodes;i++){
+        printf("%d", i);
+        for(j=0;j<num_nodes;j++){
+            printf("%5d ", matrix[i][j]);
+        }
+        printf("-\n");
+        
+    }
+                  
+}
+
+
+
+/*
+//initialisation for the data structures used MAJOR ISSUES CAUSES SEG FAULT FOR UNKNOWN REASON
+void
+initialise_space(int** graph, int** next_graph, place_node* places_list, int num_nodes){
+
+	int i,j;
+
+
+	//Initialise the 2d graph structure
+	graph = (int**) malloc(num_nodes*sizeof(int*));
+	if(graph == NULL){
+		printf("Error allocating memory for graph\n");
+		exit(MEMERROR);
+	}
+
+	for(i=0; i<num_nodes; i++){
+		graph[i] = (int*) malloc(num_nodes*sizeof(int));
+		if(graph[i] == NULL){
+			printf("Error allocating memory for graph\n");
+			exit(MEMERROR);
+		}
+	}
+
+	//Initialise the information array for places
+	places_list = (place_node*) malloc(num_nodes*sizeof(place_node));
+
+	next_graph = (int**) malloc(num_nodes*sizeof(int*));
+
+	if(next_graph == NULL){
+		printf("Error allocating memory for graph\n");
+		exit(MEMERROR);
+	}
+
+	for(j=0; j<num_nodes;j++){
+		next_graph[j] = (int*)malloc(num_nodes*sizeof(int));
+		if(next_graph[j] == NULL){
+			printf("Error allocating memory for graph\n");
+			exit(MEMERROR);
+		}
+	}
+
+
+	for(i=0;i<num_nodes;i++){
+		for(j=0;j<num_nodes;j++){
+			next_graph[i][j] = -1;
+		}
+	}
+
+
+
+}
+*/
